@@ -1,48 +1,78 @@
-// Robot Generator using local robotAPI.json (same-folder)
-// Click to add a robot at the mouse position.
-// Click a robot to delete it.
-
 let s;
 let robots = [];
 let robotPresets = [];
 
-function preload() {
-  // Because index.html, sketch.js, and robotAPI.json are in the SAME folder,
-  // we can use a relative URL. This avoids CORS issues on GitHub Pages.
-  // NOTE: If you open index.html directly from your file system (file://),
-  // the browser will block fetches. Serve it (e.g., GitHub Pages) instead.
-  const data = loadJSON("./robotAPI.json");
+// --- helper: normalize p5 loadJSON result into a real array
+function toArray(maybeArrayOrObject) {
+  if (!maybeArrayOrObject) return [];
+  if (Array.isArray(maybeArrayOrObject)) return maybeArrayOrObject;
+  if (Array.isArray(maybeArrayOrObject.presets))
+    return maybeArrayOrObject.presets;
+  if (Array.isArray(maybeArrayOrObject.robots))
+    return maybeArrayOrObject.robots;
+  // p5 sometimes returns {0:{},1:{},...}
+  const vals = Object.values(maybeArrayOrObject);
+  // if those values look like objects with your fields, accept them
+  if (vals.length && typeof vals[0] === "object") return vals;
+  return [];
+}
 
-  // Ensure we always get an array
-  if (Array.isArray(data)) {
-    robotPresets = data;
-  } else if (data && Array.isArray(data.presets)) {
-    robotPresets = data.presets;
-  } else if (data && Array.isArray(data.robots)) {
-    robotPresets = data.robots;
-  } else {
-    robotPresets = [
-      {
-        id: "fallback-1",
-        name: "nope",
-        colorIndex: 2,
-        type: "c",
-        eyes: "dashes",
-        mouth: "neutral",
-        facing: "right",
-        speed: 0.6,
-      },
-    ];
-    console.warn(
-      "⚠️ robotPresets was not an array. Check JSON structure or URL."
-    );
-  }
+function preload() {
+  const base =
+    "https://raw.githubusercontent.com/xl6294/SE2025-2-xl6294/main/robotAPI/robotAPI.json";
+  const url = `${base}?nocache=${Date.now()}`; // bust caches
+
+  loadJSON(
+    url,
+    // ✅ success
+    (raw) => {
+      console.log("✅ loadJSON success. Raw:", raw);
+      // normalize to real array
+      let arr = toArray(raw);
+      if (!arr.length) arr = Object.values(raw || {}); // p5 sometimes gives {0:{},1:{},...}
+      console.log("✅ normalized length:", arr.length);
+      robotPresets = arr;
+
+      if (!Array.isArray(robotPresets) || robotPresets.length === 0) {
+        console.warn("⚠️ normalized result still empty. Using fallback.");
+        robotPresets = [
+          {
+            id: "fallback-1",
+            name: "nope",
+            colorIndex: 2,
+            type: "c",
+            eyes: "dashes",
+            mouth: "neutral",
+            facing: "right",
+            speed: 0.6,
+          },
+        ];
+      }
+    },
+    // ❌ error
+    (err) => {
+      console.error("❌ loadJSON error:", err);
+      console.warn("⚠️ Using fallback presets.");
+      robotPresets = [
+        {
+          id: "fallback-1",
+          name: "nope",
+          colorIndex: 2,
+          type: "c",
+          eyes: "dashes",
+          mouth: "neutral",
+          facing: "right",
+          speed: 0.6,
+        },
+      ];
+    }
+  );
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   s = min(width, height) / 100;
-  scale(s);
+  // NOTE: scale once per frame in draw(); no need to scale here too.
   strokeWeight(1 / s);
   noFill();
   rectMode(CORNERS);
@@ -57,10 +87,8 @@ function draw() {
     robots[i].getMidY();
   }
 
-  // Sort by midY to fake depth (smaller midY drawn first/back)
   robots.sort((a, b) => a.midY - b.midY);
 
-  // Shadows first, then bodies/expressions
   for (let i = 0; i < robots.length; i++) robots[i].drawShadow();
   for (let i = 0; i < robots.length; i++) robots[i].display();
 }
@@ -68,19 +96,22 @@ function draw() {
 function mousePressed() {
   let amIHovering = false;
 
-  // Delete hovered robots (iterate backwards when splicing)
   for (let i = robots.length - 1; i >= 0; i--) {
-    if (robots[i].hovering === true) {
+    if (robots[i].hovering) {
       robots.splice(i, 1);
       amIHovering = true;
     }
   }
 
   if (!amIHovering) {
-    // Pick a preset from the API file
+    // guard: ensure we have an array with items
+    if (!Array.isArray(robotPresets) || robotPresets.length === 0) {
+      console.warn("No presets available.");
+      return;
+    }
+
     const p = random(robotPresets);
 
-    // Color pairs (tone = main, accent = shade)
     const colorPairs = [
       { tone: "#FFD400", accent: "#FF8C1A" },
       { tone: "#CCF20D", accent: "#0DA540" },
@@ -88,15 +119,13 @@ function mousePressed() {
       { tone: "#ff8fc7ff", accent: "#DF3020" },
     ];
 
-    // Robust color index
-    let r = 0;
+    let r;
     if (p && Number.isFinite(+p.colorIndex)) {
       r = constrain(int(p.colorIndex), 0, colorPairs.length - 1);
     } else {
       r = floor(random(colorPairs.length));
     }
 
-    // Create the robot at mouse position
     const tempRobot = new Robot(
       mouseX,
       mouseY,
@@ -110,6 +139,7 @@ function mousePressed() {
     );
 
     if (p && Number.isFinite(+p.speed)) tempRobot.speed = +p.speed;
+
     robots.push(tempRobot);
   }
 }
@@ -121,15 +151,13 @@ class Robot {
   constructor(x, y, facing, render, shade, type, eyes, mouth, name = "") {
     this.x = x;
     this.y = y;
-
-    this.facing = facing; // left/right (also sets nose direction)
-    this.render = render; // main color
-    this.shade = shade; // accent color
-    this.type = type; // a, b, c, d
-    this.eyes = eyes; // points, dashes, lashes
-    this.mouth = mouth; // smile, neutral
-    this.name = name; // optional label
-
+    this.facing = facing;
+    this.render = render;
+    this.shade = shade;
+    this.type = type;
+    this.eyes = eyes;
+    this.mouth = mouth;
+    this.name = name;
     this.shadow = "#4F136C";
     this.speed = 0.5;
     this.midY = 0;
@@ -158,7 +186,6 @@ class Robot {
     push();
     translate(this.x / s, this.y / s);
     scale(0.1);
-
     const yShift = this.type === "a" ? 75 : this.type === "b" ? 45 : 50;
     push();
     translate(0, yShift);
@@ -166,7 +193,6 @@ class Robot {
     fill(this.shadow);
     ellipse(0, 0, 100, 30);
     pop();
-
     pop();
   }
 
@@ -233,7 +259,6 @@ class Robot {
     push();
     strokeJoin(ROUND);
 
-    // eyes
     if (this.eyes === "points") {
       strokeWeight(5);
       point(-7, 0);
@@ -251,7 +276,6 @@ class Robot {
       line(4, -3, 7, 0);
     }
 
-    // mouth
     if (this.mouth === "smile") {
       strokeWeight(3);
       noFill();
@@ -262,7 +286,6 @@ class Robot {
       line(-10, 18, 10, 18);
     }
 
-    // nose (faces movement direction)
     beginShape();
     if (this.facing === "right") {
       vertex(0, 5);
@@ -279,7 +302,6 @@ class Robot {
   }
 
   display() {
-    // hover highlight
     if (dist(mouseX, mouseY, this.x, this.midY) < 7 * s) {
       this.hovering = true;
       this.shadow = "#8C28BD";
@@ -293,21 +315,19 @@ class Robot {
     scale(0.1);
     this.drawBody();
 
-    // name label below the face/body cluster
     if (this.name) {
       push();
       noStroke();
       fill(0);
       textAlign(CENTER, TOP);
-      textSize(10);
-      text(this.name, 0, 60);
+      textSize(24);
+      text(this.name, 0, -60);
       pop();
     }
 
     this.drawExpression();
     pop();
 
-    // debug: show anchor when pressing 'a'
     if (keyIsPressed && key === "a") {
       push();
       stroke("white");
