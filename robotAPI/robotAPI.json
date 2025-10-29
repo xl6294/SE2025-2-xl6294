@@ -11,12 +11,72 @@
   },
   {
     "id": "02",
-    "name": "hehe",
+    "name": "Hehe",
     "colorIndex": 1,
     "type": "a",
     "eyes": "lashes",
     "mouth": "smile",
     "facing": "left",
     "speed": 0.5
+  },
+  {
+    "id": "03",
+    "name": "Dot",
+    "colorIndex": 0,
+    "type": "b",
+    "eyes": "points",
+    "mouth": "neutral",
+    "facing": "right",
+    "speed": 0.6
+  },
+  {
+    "id": "04",
+    "name": "Puff",
+    "colorIndex": 3,
+    "type": "d",
+    "eyes": "dashes",
+    "mouth": "smile",
+    "facing": "left",
+    "speed": 0.4
+  },
+  {
+    "id": "05",
+    "name": "Blink",
+    "colorIndex": 1,
+    "type": "b",
+    "eyes": "lashes",
+    "mouth": "neutral",
+    "facing": "right",
+    "speed": 0.5
+  },
+  {
+    "id": "06",
+    "name": "Nova",
+    "colorIndex": 0,
+    "type": "a",
+    "eyes": "points",
+    "mouth": "smile",
+    "facing": "right",
+    "speed": 0.8
+  },
+  {
+    "id": "07",
+    "name": "Zippy",
+    "colorIndex": 2,
+    "type": "d",
+    "eyes": "dashes",
+    "mouth": "smile",
+    "facing": "left",
+    "speed": 0.9
+  },
+  {
+    "id": "08",
+    "name": "Lumo",
+    "colorIndex": 3,
+    "type": "c",
+    "eyes": "lashes",
+    "mouth": "neutral",
+    "facing": "right",
+    "speed": 0.55
   }
 ]
