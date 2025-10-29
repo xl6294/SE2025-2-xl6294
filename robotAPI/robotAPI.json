@@ -8,5 +8,15 @@
     "mouth": "neutral",
     "facing": "right",
     "speed": 0.6
+  },
+  {
+    "id": "rx-017",
+    "name": "Orbi",
+    "colorIndex": 2,
+    "type": "c",
+    "eyes": "dashes",
+    "mouth": "neutral",
+    "facing": "right",
+    "speed": 0.6
   }
 ]
