@@ -1,22 +1,22 @@
 [
   {
-    "id": "rx-017",
+    "id": "01",
     "name": "Orbi",
     "colorIndex": 2,
     "type": "c",
     "eyes": "dashes",
     "mouth": "neutral",
     "facing": "right",
-    "speed": 0.6
+    "speed": 0.7
   },
   {
-    "id": "rx-017",
-    "name": "Orbi",
-    "colorIndex": 2,
-    "type": "c",
-    "eyes": "dashes",
-    "mouth": "neutral",
-    "facing": "right",
-    "speed": 0.6
+    "id": "02",
+    "name": "hehe",
+    "colorIndex": 1,
+    "type": "a",
+    "eyes": "lashes",
+    "mouth": "smile",
+    "facing": "left",
+    "speed": 0.5
   }
 ]
