@@ -11,9 +11,7 @@ function preload() {
   // we can use a relative URL. This avoids CORS issues on GitHub Pages.
   // NOTE: If you open index.html directly from your file system (file://),
   // the browser will block fetches. Serve it (e.g., GitHub Pages) instead.
-  const data = loadJSON(
-    "https://raw.githubusercontent.com/xl6294/SE2025-2-xl6294/main/robotAPI/robotAPI.json"
-  );
+  const data = loadJSON("./robotAPI.json");
 
   // Ensure we always get an array
   if (Array.isArray(data)) {
@@ -26,7 +24,7 @@ function preload() {
     robotPresets = [
       {
         id: "fallback-1",
-        name: "Orbi",
+        name: "nope",
         colorIndex: 2,
         type: "c",
         eyes: "dashes",
