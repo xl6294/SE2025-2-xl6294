@@ -1,82 +1,92 @@
 [
   {
-    "id": "01",
-    "name": "Orbi",
+    "id": 1,
+    "name": "Leon",
+    "colorIndex": 3,
+    "type": "a",
+    "eyes": "lashes",
+    "mouth": "smile",
+    "facing": "rileftght",
+    "speed": 0.74
+  },
+  {
+    "id": 2,
+    "name": "Tyler",
     "colorIndex": 2,
+    "type": "b",
+    "eyes": "points",
+    "mouth": "smile",
+    "facing": "left",
+    "speed": 0.21
+  },
+  {
+    "id": 3,
+    "name": "Elliot",
+    "colorIndex": 0,
     "type": "c",
+    "eyes": "points",
+    "mouth": "smile",
+    "facing": "right",
+    "speed": 0.24
+  },
+  {
+    "id": 4,
+    "name": "Jenson",
+    "colorIndex": 0,
+    "type": "a",
+    "eyes": "lashes",
+    "mouth": "neutral",
+    "facing": "right",
+    "speed": 0.21
+  },
+  {
+    "id": 5,
+    "name": "Alex",
+    "colorIndex": 1,
+    "type": "a",
     "eyes": "dashes",
     "mouth": "neutral",
     "facing": "right",
     "speed": 0.7
   },
   {
-    "id": "02",
-    "name": "Hehe",
-    "colorIndex": 1,
-    "type": "a",
-    "eyes": "lashes",
-    "mouth": "smile",
-    "facing": "left",
-    "speed": 0.5
-  },
-  {
-    "id": "03",
-    "name": "Dot",
+    "id": 6,
+    "name": "Seth",
     "colorIndex": 0,
     "type": "b",
-    "eyes": "points",
-    "mouth": "neutral",
-    "facing": "right",
-    "speed": 0.6
-  },
-  {
-    "id": "04",
-    "name": "Puff",
-    "colorIndex": 3,
-    "type": "d",
-    "eyes": "dashes",
+    "eyes": "lashes",
     "mouth": "smile",
-    "facing": "left",
-    "speed": 0.4
+    "facing": "right",
+    "speed": 0.33
   },
   {
-    "id": "05",
-    "name": "Blink",
+    "id": 8,
+    "name": "Ignacio",
     "colorIndex": 1,
     "type": "b",
-    "eyes": "lashes",
-    "mouth": "neutral",
-    "facing": "right",
-    "speed": 0.5
-  },
-  {
-    "id": "06",
-    "name": "Nova",
-    "colorIndex": 0,
-    "type": "a",
-    "eyes": "points",
-    "mouth": "smile",
-    "facing": "right",
-    "speed": 0.8
-  },
-  {
-    "id": "07",
-    "name": "Zippy",
-    "colorIndex": 2,
-    "type": "d",
     "eyes": "dashes",
-    "mouth": "smile",
-    "facing": "left",
-    "speed": 0.9
-  },
-  {
-    "id": "08",
-    "name": "Lumo",
-    "colorIndex": 3,
-    "type": "c",
-    "eyes": "lashes",
     "mouth": "neutral",
     "facing": "right",
-    "speed": 0.55
+    "speed": 0.98
+  },
+  {
+    "id": 8,
+    "name": "Kylan",
+    "colorIndex": 3,
+    "type": "d",
+    "eyes": "points",
+    "mouth": "neutral",
+    "facing": "left",
+    "speed": 0.54
+  },
+  {
+    "id": 9,
+    "name": "Omari",
+    "colorIndex": 1,
+    "type": "d",
+    "eyes": "lashes",
+    "mouth": "smile",
+    "facing": "right",
+    "speed": 0.23
   }
 ]
