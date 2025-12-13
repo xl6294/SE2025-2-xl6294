@@ -221,7 +221,7 @@ let UI = { ...UI_BASE };
 
 function applyResponsiveUI() {
   // Make UI BIGGER on phones (small physical screens)
-  const phoneRefMin = 520;
+  const phoneRefMin = 760; // or 760 for “treat most phones as phone-ish”
   const minDim = min(width, height);
 
   let s = 1.0;
