@@ -11,8 +11,8 @@
 /* =========================
    MODE SWITCHES
 ========================= */
-const USE_API = false; // true = Apps Script endpoint, false = mock data
-const LIGHT_MODE = true; // true = light, false = dark
+let USE_API = false; // true = Apps Script endpoint, false = mock data
+let LIGHT_MODE = true; // true = light, false = dark
 const SHOW_LATEST_FIRST = true;
 
 // Apps Script Web App URL (doGet returns array of events)
@@ -201,6 +201,13 @@ const UI_BASE = {
   btnRadius: 12,
   btnTextSize: 16,
 
+  topBarH: 96, // total top bar height (2 rows)
+  topBarRowH: 48, // height of row 1 (buttons)
+  topBarPadX: 12,
+  topBarPadY: 10,
+  btnGap: 10,
+  btnW2: 86, // width of the small toggle buttons
+
   // Modal sizing (pixel space)
   modalPad: 16,
   modalCloseSize: 36,
@@ -274,7 +281,9 @@ let selectedIndex = -1;
 let statusMsg = "Not loaded yet.";
 let isFetching = false;
 
-let refreshBtn = { x: 0, y: 0, w: 140, h: 40 };
+let btnReload = { x: 0, y: 0, w: 0, h: 0 };
+let btnMode = { x: 0, y: 0, w: 0, h: 0 }; // API/Mock
+let btnTheme = { x: 0, y: 0, w: 0, h: 0 }; // Light/Dark
 
 let polling = false;
 let pollTimer = null;
@@ -310,10 +319,34 @@ function draw() {
 }
 
 function setupRefreshButton() {
-  refreshBtn.w = UI.btnW;
-  refreshBtn.h = UI.btnH;
-  refreshBtn.x = width - UI.margin - refreshBtn.w;
-  refreshBtn.y = UI.margin + 12;
+  const padX = UI.topBarPadX ?? UI.margin;
+  const padY = UI.topBarPadY ?? 10;
+
+  const h = UI.btnH;
+  const y = padY;
+
+  // widths
+  const wReload = UI.btnW;
+  const wSmall = UI.btnW2 ?? 86;
+  const gap = UI.btnGap ?? 10;
+
+  // Right-aligned group: [Theme][Mode][Reload]
+  const rightEdge = width - padX;
+
+  btnReload.w = wReload;
+  btnReload.h = h;
+  btnMode.w = wSmall;
+  btnMode.h = h;
+  btnTheme.w = wSmall;
+  btnTheme.h = h;
+
+  btnReload.x = rightEdge - wReload;
+  btnMode.x = btnReload.x - gap - wSmall;
+  btnTheme.x = btnMode.x - gap - wSmall;
+
+  btnReload.y = y;
+  btnMode.y = y;
+  btnTheme.y = y;
 }
 
 /* =========================
@@ -452,42 +485,47 @@ function stopPollingBurst() {
 function drawTopBar() {
   const T = theme();
 
+  // Top bar background (solid, no overlay)
   noStroke();
   fill(T.topBar);
   rect(0, 0, width, UI.topBarH);
 
+  // Title (left)
   fill(T.text);
-  textSize(round(14 * UI_SCALE));
   textAlign(LEFT, CENTER);
-  text("Environmental Snapshot Viewer", UI.margin, round(24 * UI_SCALE));
+  textSize(16);
+  text("Environmental Snapshot Viewer", UI.margin, (UI.topBarRowH ?? 48) / 2);
 
+  // Buttons (row 1)
+  drawButton(btnTheme, LIGHT_MODE ? "Light" : "Dark");
+  drawButton(btnMode, USE_API ? "API" : "Mock");
+  drawButton(
+    btnReload,
+    USE_API ? (polling ? "Checking" : "Refresh") : "Reload"
+  );
+
+  // Info row (row 2)
+  const infoY = (UI.topBarRowH ?? 48) + 20;
   fill(T.subtext);
-  textSize(round(12 * UI_SCALE));
-  text(statusMsg, UI.margin, round(48 * UI_SCALE));
-
-  drawRefreshButton();
+  textAlign(LEFT, CENTER);
+  textSize(12);
+  text(statusMsg, UI.margin, infoY);
 }
 
-function drawRefreshButton() {
+function drawButton(btn, label) {
   const T = theme();
-  const { x, y, w, h } = refreshBtn;
-  const hovering = isPointInRect(mouseX, mouseY, refreshBtn);
+  const hovering = isPointInRect(mouseX, mouseY, btn);
 
   stroke(T.btnStroke);
   strokeWeight(1);
   fill(hovering ? T.btnFillHover : T.btnFill);
-  rect(x, y, w, h, UI.btnRadius);
+  rect(btn.x, btn.y, btn.w, btn.h, UI.btnRadius);
 
   noStroke();
   fill(T.text);
   textAlign(CENTER, CENTER);
   textSize(UI.btnTextSize);
-
-  let label = "Refresh";
-  if (!USE_API) label = "Reload";
-  else if (polling) label = "Checking…";
-
-  text(label, x + w / 2, y + h / 2);
+  text(label, btn.x + btn.w / 2, btn.y + btn.h / 2);
 }
 
 /* =========================
@@ -770,8 +808,21 @@ function handlePress(px, py) {
   }
 
   // refresh button
-  if (isPointInRect(px, py, refreshBtn)) {
+  if (isPointInRect(px, py, btnReload)) {
     startRefreshAction();
+    return;
+  }
+
+  if (isPointInRect(px, py, btnMode)) {
+    USE_API = !USE_API;
+    selectedIndex = -1;
+    stopPollingBurst();
+    loadInitialData();
+    return;
+  }
+
+  if (isPointInRect(px, py, btnTheme)) {
+    LIGHT_MODE = !LIGHT_MODE;
     return;
   }
 
