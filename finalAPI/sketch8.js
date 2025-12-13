@@ -1,17 +1,24 @@
 /*******************************************************
  * P5.js — Environmental Snapshot Viewer (Mobile-first)
- * Complete sketch.js (theme-fixed)
+ * Full sketch.js (clean + responsive + theme-aware)
  *
- * Fixes:
- * - Cell background, baseline, stem, humidity ring outline, and text
- *   now ALL respond to LIGHT_MODE via theme().
+ * Features:
+ * - USE_API toggle (Apps Script) vs mock data
+ * - Filters out entries where note === "null" (string)
+ * - Keeps empty note "" (shows add note reminder)
+ * - Word count for note
+ * - Flow grid (variable cell widths), shared baseline per row
+ * - Tap/click cell opens modal
+ * - Refresh button: reload mock OR poll API burst
+ * - LIGHT_MODE theme toggle
+ * - Responsive scaling so UI is readable on phones
  *******************************************************/
 
 /* =========================
    MODE SWITCHES
 ========================= */
 const USE_API = false; // <-- set true when you want to use Apps Script
-const LIGHT_MODE = true; // <-- false = dark
+const LIGHT_MODE = true; // <-- true = light, false = dark
 const SHOW_LATEST_FIRST = true;
 
 // Apps Script Web App URL (doGet returns array of events)
@@ -132,7 +139,7 @@ function theme() {
     return {
       bg,
       topBar: 235,
-      panel: bg, // ✅ make cells match page background
+      panel: bg, // match page bg (so cells don't look like cards)
       ink: 0,
       text: 10,
       subtext: 70,
@@ -148,7 +155,7 @@ function theme() {
   return {
     bg,
     topBar: 18,
-    panel: bg, // ✅ make cells match page background
+    panel: bg, // match page bg
     ink: 235,
     text: 235,
     subtext: 170,
@@ -166,77 +173,73 @@ function theme() {
 
 // Base design tuned around iPhone width (~390px)
 const UI_BASE = {
+  // Global spacing
   margin: 12,
-
   topBarH: 70,
 
-  cellH: 110,
-  baselinePx: 75,
-  rowGap: 0,
-  sidePad: 8,
+  // Flow grid layout
+  cellH: 110, // portrait cell height (px)
+  baselinePx: 75, // baseline within row (px from cell top)
+  rowGap: 0, // vertical gap between rows (px)
+  sidePad: 8, // influences width calc (px)
   minW: 78,
   maxW: 190,
 
-  // Geometry in local 100×100 space
-  tempDia: 14,
-  humGapMin: 1,
-  humGapMax: 12,
+  // Geometry in local 100×100 design space
+  tempDia: 14, // local units
+  humGapMin: 1, // local units
+  humGapMax: 12, // local units
+  reminderOffsetLocal: 24, // local units above circle
 
-  // Text sizes (pixel space)
+  // Cell text (pixel space)
   textEventSize: 18,
   textNoteSize: 14,
   textArrowSize: 18,
 
-  reminderOffsetLocal: 24,
-
-  // inside UI_BASE
+  // Button
   btnW: 80,
   btnH: 40,
   btnRadius: 12,
   btnTextSize: 16,
+
+  // Modal sizing (pixel space)
+  modalPad: 16,
+  modalCloseSize: 34,
+  modalCloseRadius: 10,
+  modalTitleSize: 18,
+  modalMetaSize: 12,
+  modalLineSize: 14,
+  modalNoteLabelSize: 14,
+  modalNoteTextSize: 13,
+  modalNoteBoxH: 160,
+  modalPhotoLabelSize: 14,
+  modalPhotoTextSize: 12,
 };
 
-// We'll overwrite this at runtime based on screen size
+// Active UI (scaled by applyResponsiveUI)
 let UI = { ...UI_BASE };
 
 function applyResponsiveUI() {
-  // Scale up on small screens; mild scale on larger screens
-  const refW = 390; // iPhone-ish reference width
-  const s = constrain(width / refW, 1.0, 1.6); // bump up to 1.6x on phones
-  // ^ If it still feels small, increase the last clamp
+  // Make UI BIGGER on phones (small physical screens)
+  const phoneRefMin = 520;
+  const minDim = min(width, height);
 
-  UI = {
-    ...UI_BASE,
-    margin: UI_BASE.margin, // keep your margin stable like you wanted
+  let s = 1.0;
+  if (minDim <= phoneRefMin) {
+    s = map(minDim, 320, phoneRefMin, 1.9, 1.4);
+  }
+  s = constrain(s, 1.0, 1.9);
 
-    topBarH: round(UI_BASE.topBarH * s),
+  UI = { ...UI_BASE };
+  for (const k of Object.keys(UI)) {
+    if (typeof UI[k] === "number") UI[k] = UI_BASE[k] * s;
+  }
 
-    cellH: round(UI_BASE.cellH * s),
-    baselinePx: round(UI_BASE.baselinePx * s),
+  // keep margin from exploding
+  UI.margin = constrain(UI.margin, 10, 18);
 
-    sidePad: round(UI_BASE.sidePad * s),
-    minW: round(UI_BASE.minW * s),
-    maxW: round(UI_BASE.maxW * s),
-
-    tempDia: round(UI_BASE.tempDia * s),
-
-    // Keep humidity “gap” feeling consistent (local units), or scale slightly:
-    humGapMin: UI_BASE.humGapMin,
-    humGapMax: UI_BASE.humGapMax,
-
-    textEventSize: round(UI_BASE.textEventSize * s),
-    textNoteSize: round(UI_BASE.textNoteSize * s),
-    textArrowSize: round(UI_BASE.textArrowSize * s),
-
-    reminderOffsetLocal: UI_BASE.reminderOffsetLocal,
-    rowGap: UI_BASE.rowGap,
-
-    // ✅ button scaling
-    btnW: round(UI_BASE.btnW * s),
-    btnH: round(UI_BASE.btnH * s),
-    btnRadius: round(UI_BASE.btnRadius * s),
-    btnTextSize: round(UI_BASE.btnTextSize * s),
-  };
+  // update button bounds after scaling
+  setupRefreshButton();
 }
 
 /* =========================
@@ -265,14 +268,14 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   textFont("system-ui");
 
-  applyResponsiveUI(); // ✅ add
+  applyResponsiveUI();
   setupRefreshButton();
   loadInitialData();
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  applyResponsiveUI(); // ✅ add
+  applyResponsiveUI();
   setupRefreshButton();
 }
 
@@ -290,7 +293,7 @@ function setupRefreshButton() {
   refreshBtn.w = UI.btnW;
   refreshBtn.h = UI.btnH;
   refreshBtn.x = width - UI.margin - refreshBtn.w;
-  refreshBtn.y = UI.margin + 12; // stays near top bar
+  refreshBtn.y = UI.margin + 12;
 }
 
 /* =========================
@@ -319,9 +322,10 @@ async function fetchAndUpdate(reason = "manual") {
   statusMsg = `Fetching… (${reason})`;
 
   try {
-    const url = `${GAS_GET_URL}?t=${Date.now()}`;
+    const url = `${GAS_GET_URL}?t=${Date.now()}`; // cache-bust
     const resp = await fetch(url, { method: "GET" });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
     const data = await resp.json();
     rawData = Array.isArray(data) ? data : [];
     processRawData(`Loaded (${reason})`);
@@ -333,9 +337,10 @@ async function fetchAndUpdate(reason = "manual") {
 }
 
 function processRawData(reason = "") {
+  // Normalize first, then filter out literal "null" string
   entries = rawData.map(normalizeEntry).filter((d) => d.note !== "null");
 
-  // stable order for “latest first” via reverse()
+  // Stable order: event_id ascending (so latest-first just reverses)
   entries.sort((a, b) => (a.event_id || 0) - (b.event_id || 0));
   validEntryIndex = entries.map((_, i) => i);
 
@@ -343,12 +348,13 @@ function processRawData(reason = "") {
   const was = lastMaxEventId;
   lastMaxEventId = maxId;
 
-  if (USE_API && maxId > was && was !== 0)
+  if (USE_API && maxId > was && was !== 0) {
     statusMsg = `✅ New entry: event_id ${maxId}`;
-  else
+  } else {
     statusMsg = `${reason}. Entries: ${entries.length}. Latest: ${
       maxId || "—"
     }`;
+  }
 }
 
 function normalizeEntry(d) {
@@ -446,19 +452,19 @@ function drawTopBar() {
 function drawRefreshButton() {
   const T = theme();
   const { x, y, w, h } = refreshBtn;
+
+  // "hover" is mostly irrelevant on phone but harmless on desktop
   const hovering = isPointInRect(mouseX, mouseY, refreshBtn);
 
-  // Button shape
   stroke(T.btnStroke);
   strokeWeight(1);
   fill(hovering ? T.btnFillHover : T.btnFill);
-  rect(x, y, w, h, UI.btnRadius); // 👈 responsive radius
+  rect(x, y, w, h, UI.btnRadius);
 
-  // Button label
   noStroke();
   fill(T.text);
   textAlign(CENTER, CENTER);
-  textSize(UI.btnTextSize); // 👈 larger + responsive
+  textSize(UI.btnTextSize);
 
   let label = "Refresh";
   if (!USE_API) label = "Reload";
@@ -469,6 +475,9 @@ function drawRefreshButton() {
 
 /* =========================
    DRAW: FLOW GRID (Option B)
+   - variable widths driven by humidity ring size (relative ring)
+   - wraps rows
+   - ONE continuous baseline per row (margin-to-margin)
 ========================= */
 function drawGrid() {
   const T = theme();
@@ -483,6 +492,7 @@ function drawGrid() {
     return;
   }
 
+  // Decide display order (use indices so we don't mutate entries)
   let displayIndices = validEntryIndex.slice();
   if (SHOW_LATEST_FIRST) displayIndices.reverse();
 
@@ -491,7 +501,7 @@ function drawGrid() {
   let rowBaselineY = cursorY + UI.baselinePx;
 
   function drawRowBaseline(yPx) {
-    stroke(T.ink); // ✅ theme-driven
+    stroke(T.ink);
     strokeWeight(2);
     strokeCap(SQUARE);
     line(UI.margin, yPx, width - UI.margin, yPx);
@@ -501,19 +511,22 @@ function drawGrid() {
     const entryIdx = displayIndices[k];
     const d = entries[entryIdx];
 
-    // humidity ring size (relative to temp circle)
+    // Relative humidity ring diameter in local units
     const hum = constrain(d.humidity_pct, 0, 100);
     const humGap = map(hum, 0, 100, UI.humGapMin, UI.humGapMax);
     const humDiaLocal = UI.tempDia + 2 * humGap;
 
+    // Convert local diameter -> pixels using height-based scale
     const sFromH = UI.cellH / 100;
     const ringDiameterPx = humDiaLocal * sFromH;
 
+    // Variable width
     let cellW = ringDiameterPx + UI.sidePad * 2 + 40;
     cellW = constrain(cellW, UI.minW, UI.maxW);
 
     const rightLimit = width - UI.margin;
 
+    // Wrap to next row if needed
     if (cursorX + cellW > rightLimit) {
       drawRowBaseline(rowBaselineY);
       cursorX = UI.margin;
@@ -525,45 +538,53 @@ function drawGrid() {
     cursorX += cellW;
   }
 
+  // Baseline for last row
   drawRowBaseline(rowBaselineY);
 }
 
 /* =========================
    DRAW: SINGLE CELL
+   - geometry in centered uniform-scaled 100x100
+   - text in pixel space (uniform size)
 ========================= */
 function drawCell(d, x, y, w, h, entryIndex, baselineYpx) {
   const T = theme();
 
-  // Cell background ✅ theme-driven
+  // Cell background
   noStroke();
   fill(T.panel);
   rect(x, y, w, h);
 
   // Uniform scale so circles stay circles
   const SCALE = min(w, h) / 100;
+
+  // Center the 100x100 design space inside the rectangle
   const DX = (w - 100 * SCALE) / 2;
   const DY = (h - 100 * SCALE) / 2;
 
+  // Baseline px -> local (0..100)
   const baselineLocalY = (baselineYpx - (y + DY)) / SCALE;
 
+  // Stem height from note word count
   const wc = constrain(d.note_word_count, 0, 60);
   const stemTopLocalY = baselineLocalY - wc;
 
+  // Humidity ring as "gap thickness" outside temp circle
   const hum = constrain(d.humidity_pct, 0, 100);
   const humGap = map(hum, 0, 100, UI.humGapMin, UI.humGapMax);
   const humDia = UI.tempDia + 2 * humGap;
 
-  // Geometry (local 100x100)
+  // --- Geometry (local space) ---
   push();
   translate(x + DX, y + DY);
   scale(SCALE);
 
-  // Stem ✅ theme-driven
+  // Stem
   stroke(T.ink);
   strokeWeight(2);
   line(50, baselineLocalY, 50, stemTopLocalY);
 
-  // Temp circle (color)
+  // Temp circle (color from temp_c)
   colorMode(HSB, 360, 100, 100, 1);
   const hue = map(constrain(d.temp_c, -10, 35), -10, 35, 220, 20);
   noStroke();
@@ -571,29 +592,31 @@ function drawCell(d, x, y, w, h, entryIndex, baselineYpx) {
   circle(50, stemTopLocalY, UI.tempDia);
   colorMode(RGB, 255);
 
-  // Humidity ring ✅ theme-driven
+  // Humidity ring
   noFill();
   stroke(T.ink);
   strokeWeight(2);
   circle(50, stemTopLocalY, humDia);
 
-  // Mask below baseline ✅ theme-driven
+  // Mask under baseline (blocks anything under baseline)
   noStroke();
   fill(T.panel);
   rect(0, baselineLocalY, 100, 25);
 
   pop();
 
-  // Text (pixel space) ✅ theme-driven
+  // --- Text (pixel space) ---
   const cx = x + w / 2;
 
   fill(T.text);
   noStroke();
   textAlign(CENTER, CENTER);
 
+  // Event ID below baseline
   textSize(UI.textEventSize);
   text(`${d.event_id}`, cx, baselineYpx + 26);
 
+  // Add-note reminder: above circle, follows stem top
   if ((d.note ?? "").trim() === "") {
     const reminderYLocal = stemTopLocalY - UI.reminderOffsetLocal;
     const reminderYpx = y + DY + reminderYLocal * SCALE;
@@ -605,6 +628,7 @@ function drawCell(d, x, y, w, h, entryIndex, baselineYpx) {
     text("↓", cx, reminderYpx);
   }
 
+  // Store click bounds
   d.__cellBounds = { x, y, w, h, entryIndex };
 }
 
@@ -614,89 +638,101 @@ function drawCell(d, x, y, w, h, entryIndex, baselineYpx) {
 function drawModal(d) {
   const T = theme();
 
+  // Dim overlay
   noStroke();
   fill(T.overlay[0], T.overlay[1]);
   rect(0, 0, width, height);
 
-  const pad = 16;
+  // Card
+  const pad = UI.modalPad;
   const cardW = width - pad * 2;
   const cardH = height - pad * 2;
 
   fill(T.panel);
   rect(pad, pad, cardW, cardH, 16);
 
-  const closeSize = 34;
+  // Close button
+  const closeSize = UI.modalCloseSize;
   const closeX = pad + cardW - closeSize - 10;
   const closeY = pad + 10;
 
-  fill(T.ink);
-  rect(closeX, closeY, closeSize, closeSize, 10);
+  stroke(T.btnStroke);
+  strokeWeight(1);
+  fill(T.btnFill);
+  rect(closeX, closeY, closeSize, closeSize, UI.modalCloseRadius);
 
-  fill(T.panel);
+  noStroke();
+  fill(T.text);
   textAlign(CENTER, CENTER);
-  textSize(16);
+  textSize(UI.btnTextSize);
   text("✕", closeX + closeSize / 2, closeY + closeSize / 2);
+
+  // Text content
+  const x = pad + 18;
+  let y = pad + 18;
 
   fill(T.text);
   textAlign(LEFT, TOP);
 
-  const x = pad + 18;
-  let y = pad + 18;
-
-  textSize(18);
+  textSize(UI.modalTitleSize);
   text(`event_id: ${d.event_id}`, x, y);
-  y += 26;
+  y += UI.modalTitleSize + 6;
 
-  textSize(12);
   fill(T.subtext);
+  textSize(UI.modalMetaSize);
   text(`created_at: ${d.created_at}`, x, y);
-  y += 22;
+  y += UI.modalMetaSize + 14;
 
   fill(T.text);
-  textSize(14);
+  textSize(UI.modalLineSize);
   text(`Temp (°C): ${d.temp_c}`, x, y);
-  y += 22;
+  y += UI.modalLineSize + 8;
   text(`Humidity (%): ${d.humidity_pct}`, x, y);
-  y += 22;
+  y += UI.modalLineSize + 8;
   text(`Sound loudness: ${d.sound_loudness}`, x, y);
-  y += 22;
+  y += UI.modalLineSize + 8;
   text(`Note word count: ${d.note_word_count}`, x, y);
-  y += 28;
+  y += UI.modalLineSize + 14;
 
-  textSize(14);
+  // Note box
+  textSize(UI.modalNoteLabelSize);
   text("Note:", x, y);
-  y += 22;
-
-  const noteText =
-    (d.note ?? "").trim() === "" ? "(empty — submit via Google Form)" : d.note;
+  y += UI.modalNoteLabelSize + 8;
 
   const noteBoxW = cardW - 36;
-  const noteBoxH = 160;
+  const noteBoxH = UI.modalNoteBoxH;
 
-  noFill();
   stroke(T.ink);
+  strokeWeight(1);
+  noFill();
   rect(x, y, noteBoxW, noteBoxH, 10);
 
   noStroke();
   fill(T.text);
-  textSize(13);
+  textSize(UI.modalNoteTextSize);
+
+  const noteText =
+    (d.note ?? "").trim() === "" ? "(empty — submit via Google Form)" : d.note;
+
   text(noteText, x + 10, y + 10, noteBoxW - 20, noteBoxH - 20);
-  y += noteBoxH + 18;
+  y += noteBoxH + 16;
 
-  textSize(14);
+  // Photo URL
   fill(T.text);
+  textSize(UI.modalPhotoLabelSize);
   text("photo_url:", x, y);
-  y += 20;
+  y += UI.modalPhotoLabelSize + 6;
 
-  textSize(12);
-  fill(...T.link);
+  textSize(UI.modalPhotoTextSize);
+  fill(T.link[0], T.link[1], T.link[2]);
   text(d.photo_url || "(none)", x, y, noteBoxW, 60);
 
+  // Store close bounds for interaction
   d.__closeBounds = { x: closeX, y: closeY, w: closeSize, h: closeSize };
 }
 
 /* =========================
-   INTERACTION
+   INTERACTION (mouse + touch)
 ========================= */
 function mousePressed() {
   handlePress(mouseX, mouseY);
@@ -705,23 +741,27 @@ function mousePressed() {
 function touchStarted() {
   if (touches && touches.length > 0) {
     handlePress(touches[0].x, touches[0].y);
-    return false;
+    return false; // prevent page scroll
   }
 }
 
 function handlePress(px, py) {
+  // Modal close
   if (selectedIndex >= 0) {
     const d = entries[selectedIndex];
-    if (d.__closeBounds && isPointInRect(px, py, d.__closeBounds))
+    if (d.__closeBounds && isPointInRect(px, py, d.__closeBounds)) {
       selectedIndex = -1;
+    }
     return;
   }
 
+  // Refresh button
   if (isPointInRect(px, py, refreshBtn)) {
     startRefreshAction();
     return;
   }
 
+  // Cell hit test
   for (const d of entries) {
     if (!d.__cellBounds) continue;
     if (isPointInRect(px, py, d.__cellBounds)) {
