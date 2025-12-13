@@ -244,7 +244,7 @@ let UI = { ...UI_BASE };
 
 function applyResponsiveUI() {
   // Treat anything with a "small side" <= this as phone/tablet UI
-  const phoneRefMin = 1440; // <- bump this up
+  const phoneRefMin = 760; // <- bump this up
   const minDim = min(width, height);
 
   let s = 1.0;
