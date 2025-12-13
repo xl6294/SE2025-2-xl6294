@@ -24,7 +24,7 @@ const API_URL =
 
 // Background polling (lightweight "always-on" refresh)
 // You can set this to 0 to disable background polling completely.
-const BACKGROUND_POLL_MS = 60000; // 60s
+const BACKGROUND_POLL_MS = 600000; // 600s
 // 8s is a safe default; burst mode handles fast checking
 
 // Burst checking (manual “handshake mode”)
