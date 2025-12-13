@@ -219,26 +219,49 @@ const UI_BASE = {
 // Active UI (scaled by applyResponsiveUI)
 let UI = { ...UI_BASE };
 
+// function applyResponsiveUI() {
+//   // Make UI BIGGER on phones (small physical screens)
+//   const phoneRefMin = 760; // or 760 for “treat most phones as phone-ish”
+//   const minDim = min(width, height);
+
+//   let s = 1.0;
+//   if (minDim <= phoneRefMin) {
+//     s = map(minDim, 320, phoneRefMin, 1.9, 1.4);
+//   }
+//   s = constrain(s, 1.0, 1.9);
+
+//   UI = { ...UI_BASE };
+//   for (const k of Object.keys(UI)) {
+//     if (typeof UI[k] === "number") UI[k] = UI_BASE[k] * s;
+//   }
+
+//   // keep margin from exploding
+//   UI.margin = constrain(UI.margin, 10, 18);
+
+//   // update button bounds after scaling
+//   setupRefreshButton();
+// }
+
 function applyResponsiveUI() {
-  // Make UI BIGGER on phones (small physical screens)
-  const phoneRefMin = 760; // or 760 for “treat most phones as phone-ish”
+  // Treat anything with a "small side" <= this as phone/tablet UI
+  const phoneRefMin = 760; // <- bump this up
   const minDim = min(width, height);
 
   let s = 1.0;
+
   if (minDim <= phoneRefMin) {
-    s = map(minDim, 320, phoneRefMin, 1.9, 1.4);
+    // Smaller side => bigger scale
+    s = map(minDim, 360, phoneRefMin, 2.0, 1.35);
   }
-  s = constrain(s, 1.0, 1.9);
+
+  s = constrain(s, 1.0, 2.0);
 
   UI = { ...UI_BASE };
   for (const k of Object.keys(UI)) {
     if (typeof UI[k] === "number") UI[k] = UI_BASE[k] * s;
   }
 
-  // keep margin from exploding
   UI.margin = constrain(UI.margin, 10, 18);
-
-  // update button bounds after scaling
   setupRefreshButton();
 }
 
