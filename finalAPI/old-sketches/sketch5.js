@@ -415,15 +415,11 @@ function drawRefreshButton() {
 }
 
 /*******************************************************
- * DRAW: GRID
- *******************************************************/
-
-/*******************************************************
  * DRAW: FLOW GRID (Option B)
- * - variable cell widths driven by humidity ring size
+ * - variable cell widths driven by humidity ring diameter
  * - portrait cells (fixed height)
  * - wraps rows when it hits the right edge
- * - draws ONE continuous baseline per row
+ * - draws ONE continuous baseline per row (margin -> margin)
  *******************************************************/
 function drawGrid() {
   const topOffset = 70 + margin;
@@ -436,42 +432,37 @@ function drawGrid() {
     return;
   }
 
-  // ---- Flow layout tuning knobs ----
-  const CELL_H = 150; // portrait height in pixels
-  const BASELINE_PX = 105; // baseline position inside each cell (in px from cell top)
+  // ---- Flow layout tuning knobs (pixel space) ----
+  const CELL_H = 110; // cell height in pixels
+  const BASELINE_PX = 75; // baseline position inside each row (px from row top)
   const MIN_W = 78; // min cell width
   const MAX_W = 190; // max cell width
-  const SIDE_PAD = 8; // padding so circle doesn't touch cell edges
-  const ROW_GAP = 0; // no vertical gutters (you asked no padding between cells)
+  const SIDE_PAD = 8; // padding so circles don't touch cell edges
+  const ROW_GAP = 0; // vertical gap between rows (0 = no gutter)
 
-  // Display order:
-  // - If you want latest first: show newest entry at the top-left
-  // - If you want oldest first: show oldest entry at top-left
-  // Toggle by switching which list we use.
+  // Width formula tuning:
+  const EXTRA_W = 40; // extra breathing room for stem + label
+
+  // Display order
   const showLatestFirst = true;
 
   // Work on a list of indices so we don't mutate entries
   let displayIndices = validEntryIndex.slice();
-
-  // Latest first = reverse (assuming entries are sorted by event_id asc)
-  // If your entries aren't sorted, you can sort here by event_id.
   if (showLatestFirst) displayIndices.reverse();
 
-  // Start cursor
+  // Row cursor
   let cursorX = margin;
   let cursorY = topOffset;
 
-  // Track row baseline for continuous baseline drawing
-  let rowStartX = cursorX;
+  // Baseline for the current row (in pixels)
   let rowBaselineY = cursorY + BASELINE_PX;
-  let rowEndX = cursorX;
 
-  // Helper: finish a row baseline
-  function drawRowBaseline() {
+  // Draw one baseline chord across the full row
+  function drawRowBaseline(yPx) {
     stroke(0);
     strokeWeight(2);
     strokeCap(SQUARE);
-    line(rowStartX, rowBaselineY, rowEndX, rowBaselineY);
+    line(margin, yPx, width - margin, yPx);
   }
 
   // Walk through entries in display order
@@ -479,123 +470,148 @@ function drawGrid() {
     const entryIdx = displayIndices[k];
     const d = entries[entryIdx];
 
-    // Map humidity to your ring diameter range (same as drawCell uses, in "100-space")
+    // --- Estimate humidity ring diameter in pixels to decide cell width ---
+    // We want width to respond to the same humidity logic used in drawCell().
+    // drawCell uses local 0..100 space, then scales by SCALE.
+    // We'll approximate SCALE using CELL_H here (good enough for layout).
+
+    const tempDiaLocal = 14;
+    const HUM_GAP_MIN = 1;
+    const HUM_GAP_MAX = 12;
+
     const hum = constrain(d.humidity_pct, 0, 100);
-    const humSize100 = map(hum, 0, 100, 10, 34); // diameter in 0..100 cell coords
+    const humGapLocal = map(hum, 0, 100, HUM_GAP_MIN, HUM_GAP_MAX);
+    const humDiaLocal = tempDiaLocal + 2 * humGapLocal;
 
-    // Convert that 100-space size into pixels based on cell height scaling:
-    // We scale y by CELL_H/100 in drawCell (sy). We'll use that to estimate diameter in px.
-    const sy = CELL_H / 100;
-    const ringDiameterPx = humSize100 * sy;
+    // Approximate SCALE based on height (local 100 -> CELL_H pixels)
+    const approxScale = CELL_H / 100;
+    const ringDiameterPx = humDiaLocal * approxScale;
 
-    // Variable width: ring diameter + padding + some extra breathing room
-    let cellW = ringDiameterPx + SIDE_PAD * 2 + 40; // 40 gives room for stem + label
+    // Variable width: ring diameter + padding + extra room for stem + label
+    let cellW = ringDiameterPx + SIDE_PAD * 2 + EXTRA_W;
     cellW = constrain(cellW, MIN_W, MAX_W);
 
     // Wrap to next row if needed
     const rightLimit = width - margin;
     if (cursorX + cellW > rightLimit) {
-      // draw baseline for the row we just finished
-      rowEndX = cursorX;
-      drawRowBaseline();
+      // finish previous row baseline
+      drawRowBaseline(rowBaselineY);
 
-      // move to next row
+      // start next row
       cursorX = margin;
       cursorY += CELL_H + ROW_GAP;
-
-      rowStartX = cursorX;
       rowBaselineY = cursorY + BASELINE_PX;
     }
 
-    // Draw the cell, passing rowBaselineY so baseline is shared
+    // Draw the cell, passing rowBaselineY so the baseline aligns across the row
     drawCell(d, cursorX, cursorY, cellW, CELL_H, entryIdx, rowBaselineY);
 
-    // advance cursor
+    // Advance cursor
     cursorX += cellW;
-
-    // keep updating row end for baseline drawing
-    rowEndX = cursorX;
   }
 
   // Draw baseline for the last row
-  drawRowBaseline();
+  drawRowBaseline(rowBaselineY);
 }
 
+/*******************************************************
+ * DRAW: SINGLE CELL
+ * - geometry drawn in local 100x100 space (scaled uniformly)
+ * - text drawn in pixel space for uniform font size
+ *******************************************************/
 function drawCell(d, x, y, w, h, entryIndex, baselineYpx) {
+  // ---------- cell background ----------
   noStroke();
   fill(255);
-  // rect(x, y, w - 6, h - 6, 12);
-  rect(x, y, w, h); // full cell
+  rect(x, y, w, h);
 
+  // ---------- shared layout (pixel space) ----------
+  // Uniform scale keeps circles circular even in non-square cells
+  const SCALE = min(w, h) / 100;
+
+  // Center the 100x100 design space inside the rectangle
+  const DX = (w - 100 * SCALE) / 2;
+  const DY = (h - 100 * SCALE) / 2;
+
+  // Convert row baseline (pixel) -> local (0..100) inside the design space
+  // Local origin is (x + DX, y + DY) in pixels, scaled by SCALE
+  const baselineLocalY = (baselineYpx - (y + DY)) / SCALE;
+
+  // ---------- data-driven geometry (local units) ----------
+  const wc = constrain(d.note_word_count, 0, 60); // stem height in local units
+  const stemTopLocalY = baselineLocalY - wc; // circle center y (top of stem)
+
+  // Temp circle diameter (fixed in local units)
+  const tempDia = 14;
+
+  // Humidity ring diameter = tempDia + 2*gap
+  const HUM_GAP_MIN = 1; // very dry -> ring hugs temp circle
+  const HUM_GAP_MAX = 12; // very humid -> ring expands more
+
+  const hum = constrain(d.humidity_pct, 0, 100);
+  const humGap = map(hum, 0, 100, HUM_GAP_MIN, HUM_GAP_MAX);
+  const humDia = tempDia + 2 * humGap;
+
+  // ---------- draw geometry in local 100x100 space ----------
   push();
-  translate(x, y);
+  translate(x + DX, y + DY);
+  scale(SCALE);
 
-  // ✅ uniform scale so circles stay circles
-  const s = min(w, h) / 100;
-
-  // ✅ center the 100x100 “design space” in the rectangle
-  const dx = (w - 100 * s) / 2;
-  const dy = (h - 100 * s) / 2;
-  translate(dx, dy);
-  scale(s);
-
-  // Convert row baseline from pixels -> local 0..100 coordinates
-  // baselineYpx is in canvas pixels; our local origin is y + dy, and scale is s.
-  const baselineLocalY = (baselineYpx - (y + dy)) / s;
-
-  // stem = note word count
-  const wc = constrain(d.note_word_count, 0, 60);
-  const stemTopY = baselineLocalY - wc;
-
+  // Stem
   stroke(0);
   strokeWeight(2);
-  line(50, baselineLocalY, 50, stemTopY);
+  line(50, baselineLocalY, 50, stemTopLocalY);
 
-  // temp circle (color)
+  // Temp circle (color encodes temperature)
   colorMode(HSB, 360, 100, 100, 1);
   const hue = map(constrain(d.temp_c, -10, 35), -10, 35, 220, 20);
   noStroke();
   fill(hue, 80, 90, 1);
-  circle(50, stemTopY, 14);
+  circle(50, stemTopLocalY, tempDia);
   colorMode(RGB, 255);
 
-  // humidity ring (size)
-  const hum = constrain(d.humidity_pct, 0, 100);
-  const humSize = map(hum, 0, 100, 10, 34);
+  // Humidity ring (gap encodes humidity)
   noFill();
   stroke(0);
   strokeWeight(2);
-  circle(50, stemTopY, humSize);
+  circle(50, stemTopLocalY, humDia);
 
-  // --- Mask rectangle under baseline (to block graphics) ---
+  // Mask below baseline (blocks any geometry under the baseline)
   noStroke();
   fill(255);
   rect(0, baselineLocalY, 100, 25);
 
-  // --- Event ID (bottom center) ---
-  fill(0);
-  textAlign(CENTER, CENTER);
-  textSize(12);
-  text(`${d.event_id}`, 50, baselineLocalY + 12);
-
-  // --- Add-note reminder (positioned above humidity circle) ---
-  if ((d.note ?? "").trim() === "") {
-    const reminderOffset = 24; // distance above humidity circle
-    const reminderY = stemTopY - reminderOffset;
-
-    fill(0);
-    textAlign(CENTER, CENTER);
-
-    textSize(9);
-    text("add note", 50, reminderY - 6);
-
-    textSize(14);
-    text("↓", 50, reminderY + 6);
-  }
-
   pop();
 
-  // store click bounds
+  // ---------- draw TEXT in pixel space (uniform size) ----------
+  const TEXT_EVENT_SIZE = 18;
+  const TEXT_NOTE_SIZE = 14;
+  const TEXT_ARROW_SIZE = 18;
+
+  const cx = x + w / 2; // center of this cell in pixels
+  const baselineY = baselineYpx; // baseline already in pixel space
+
+  // Event id (below baseline)
+  fill(0);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(TEXT_EVENT_SIZE);
+  text(`${d.event_id}`, cx, baselineY + 26);
+
+  // Add-note reminder (positioned above the circle, follows stem top)
+  if ((d.note ?? "").trim() === "") {
+    const reminderOffsetLocal = 24; // local units above the circle
+    const reminderYLocal = stemTopLocalY - reminderOffsetLocal;
+    const reminderYpx = y + DY + reminderYLocal * SCALE;
+
+    textSize(TEXT_NOTE_SIZE);
+    text("add note", cx, reminderYpx - 20);
+
+    textSize(TEXT_ARROW_SIZE);
+    text("↓", cx, reminderYpx);
+  }
+
+  // ---------- store click bounds ----------
   d.__cellBounds = { x, y, w, h, entryIndex };
 }
 
