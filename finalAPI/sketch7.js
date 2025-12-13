@@ -10,7 +10,7 @@
 /* =========================
    MODE SWITCHES
 ========================= */
-const USE_API = true; // <-- set true when you want to use Apps Script
+const USE_API = false; // <-- set true when you want to use Apps Script
 const LIGHT_MODE = true; // <-- false = dark
 const SHOW_LATEST_FIRST = true;
 
@@ -128,40 +128,33 @@ const mockData = [
 ========================= */
 function theme() {
   if (LIGHT_MODE) {
+    const bg = 245;
     return {
-      bg: 245,
+      bg,
       topBar: 235,
-      // panel: 255,
-      panel: 245,
-
+      panel: bg, // ✅ make cells match page background
       ink: 0,
       text: 10,
       subtext: 70,
-
       btnFill: 255,
       btnFillHover: 250,
       btnStroke: 0,
-
       overlay: [0, 120],
       link: [0, 0, 200],
     };
   }
 
-  // Dark mode (IMPORTANT: panel is dark, ink is light)
+  const bg = 10;
   return {
-    bg: 10,
+    bg,
     topBar: 18,
-    // panel: 28,
-    panel: 10,
-
+    panel: bg, // ✅ make cells match page background
     ink: 235,
     text: 235,
     subtext: 170,
-
     btnFill: 28,
     btnFillHover: 40,
     btnStroke: 235,
-
     overlay: [0, 210],
     link: [120, 170, 255],
   };
@@ -170,8 +163,12 @@ function theme() {
 /* =========================
    LAYOUT / TUNING KNOBS
 ========================= */
-const UI = {
+
+// Base design tuned around iPhone width (~390px)
+const UI_BASE = {
   margin: 12,
+
+  topBarH: 70,
 
   cellH: 110,
   baselinePx: 75,
@@ -192,8 +189,55 @@ const UI = {
 
   reminderOffsetLocal: 24,
 
-  topBarH: 70,
+  // inside UI_BASE
+  btnW: 80,
+  btnH: 40,
+  btnRadius: 12,
+  btnTextSize: 16,
 };
+
+// We'll overwrite this at runtime based on screen size
+let UI = { ...UI_BASE };
+
+function applyResponsiveUI() {
+  // Scale up on small screens; mild scale on larger screens
+  const refW = 390; // iPhone-ish reference width
+  const s = constrain(width / refW, 1.0, 1.6); // bump up to 1.6x on phones
+  // ^ If it still feels small, increase the last clamp
+
+  UI = {
+    ...UI_BASE,
+    margin: UI_BASE.margin, // keep your margin stable like you wanted
+
+    topBarH: round(UI_BASE.topBarH * s),
+
+    cellH: round(UI_BASE.cellH * s),
+    baselinePx: round(UI_BASE.baselinePx * s),
+
+    sidePad: round(UI_BASE.sidePad * s),
+    minW: round(UI_BASE.minW * s),
+    maxW: round(UI_BASE.maxW * s),
+
+    tempDia: round(UI_BASE.tempDia * s),
+
+    // Keep humidity “gap” feeling consistent (local units), or scale slightly:
+    humGapMin: UI_BASE.humGapMin,
+    humGapMax: UI_BASE.humGapMax,
+
+    textEventSize: round(UI_BASE.textEventSize * s),
+    textNoteSize: round(UI_BASE.textNoteSize * s),
+    textArrowSize: round(UI_BASE.textArrowSize * s),
+
+    reminderOffsetLocal: UI_BASE.reminderOffsetLocal,
+    rowGap: UI_BASE.rowGap,
+
+    // ✅ button scaling
+    btnW: round(UI_BASE.btnW * s),
+    btnH: round(UI_BASE.btnH * s),
+    btnRadius: round(UI_BASE.btnRadius * s),
+    btnTextSize: round(UI_BASE.btnTextSize * s),
+  };
+}
 
 /* =========================
    DATA + UI STATE
@@ -220,12 +264,15 @@ let pollTicks = 0;
 function setup() {
   createCanvas(windowWidth, windowHeight);
   textFont("system-ui");
+
+  applyResponsiveUI(); // ✅ add
   setupRefreshButton();
   loadInitialData();
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
+  applyResponsiveUI(); // ✅ add
   setupRefreshButton();
 }
 
@@ -240,10 +287,10 @@ function draw() {
 }
 
 function setupRefreshButton() {
-  refreshBtn.w = 140;
-  refreshBtn.h = 40;
+  refreshBtn.w = UI.btnW;
+  refreshBtn.h = UI.btnH;
   refreshBtn.x = width - UI.margin - refreshBtn.w;
-  refreshBtn.y = UI.margin + 12;
+  refreshBtn.y = UI.margin + 12; // stays near top bar
 }
 
 /* =========================
@@ -398,21 +445,23 @@ function drawTopBar() {
 
 function drawRefreshButton() {
   const T = theme();
-  const hovering = isPointInRect(mouseX, mouseY, refreshBtn);
   const { x, y, w, h } = refreshBtn;
+  const hovering = isPointInRect(mouseX, mouseY, refreshBtn);
 
+  // Button shape
   stroke(T.btnStroke);
   strokeWeight(1);
   fill(hovering ? T.btnFillHover : T.btnFill);
-  rect(x, y, w, h, 10);
+  rect(x, y, w, h, UI.btnRadius); // 👈 responsive radius
 
+  // Button label
   noStroke();
   fill(T.text);
   textAlign(CENTER, CENTER);
-  textSize(13);
+  textSize(UI.btnTextSize); // 👈 larger + responsive
 
   let label = "Refresh";
-  if (!USE_API) label = "Reload Mock";
+  if (!USE_API) label = "Reload";
   else if (polling) label = "Checking…";
 
   text(label, x + w / 2, y + h / 2);
